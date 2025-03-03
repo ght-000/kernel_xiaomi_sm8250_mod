@@ -1,50 +1,42 @@
 name: Build Android Kernel
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 允许手动触发
+  push:
+    branches: [ main ] # 根据您的仓库分支调整
 jobs:
-  build:
+  build-kernel:
     runs-on: ubuntu-22.04
-    timeout-minutes: 120
+    timeout-minutes: 120  # 根据编译时间调整
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-      with:
-        repository: liyafe1997/kernel_xiaomi_sm8250_mod
-        ref: android14-lineage21-mod
-        path: kernel_xiaomi_sm8250_mod
-    - name: Setup environment
+    - name: Set up environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache
-    - name: Prepare directories
-      run: |
-        mkdir -p $GITHUB_WORKSPACE/source
-        mv kernel_xiaomi_sm8250_mod $GITHUB_WORKSPACE/source/
+        sudo apt-get install -y \
+          build-essential git curl wget \
+          bison flex zip bc cpio \
+          libssl-dev ccache
     - name: Setup Proton Clang
       run: |
-        cd $GITHUB_WORKSPACE/source
         wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
-        unzip 20210522.zip -d proton-clang
-        rm 20210522.zip
-    - name: Set environment variables
+        unzip 20210522.zip
+        mv proton-clang-20210522 proton-clang
+    - name: Clone Kernel Source
       run: |
-        echo "CCACHE_DIR=$GITHUB_WORKSPACE/ccache" >> $GITHUB_ENV
-        echo "PATH=$GITHUB_WORKSPACE/source/proton-clang/bin:$PATH" >> $GITHUB_ENV
-        echo 'export ARCH=arm64' >> $BASH_ENV
-        echo 'export SUBARCH=arm64' >> $BASH_ENV
-    - name: Initialize ccache
+        git clone https://github.com/liyafe1997/kernel_xiaomi_sm8250_mod.git \
+          --branch android14-lineage21-mod \
+          --depth=1 \
+          kernel_xiaomi_sm8250_mod
+    - name: Build Kernel
       run: |
-        mkdir -p $CCACHE_DIR
-        ccache -M 10G
-    - name: Build kernel
-      run: |
-        cd $GITHUB_WORKSPACE/source/kernel_xiaomi_sm8250_mod
+        cd kernel_xiaomi_sm8250_mod
+        chmod +x build.sh
         bash build.sh lmi ksu
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+    # 可选：上传编译产物
+    - name: Upload Artifacts
+      if: success()
+      uses: actions/upload-artifact@v4
       with:
         name: kernel-build
         path: |
-          ${{ github.workspace }}/source/kernel_xiaomi_sm8250_mod/out/Image*
-          ${{ github.workspace }}/source/kernel_xiaomi_sm8250_mod/out/*.zip
-        if-no-files-found: error
+          kernel_xiaomi_sm8250_mod/out/*.zip
+          kernel_xiaomi_sm8250_mod/out/*.img
