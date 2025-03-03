@@ -38,16 +38,18 @@ jobs:
           make \
           zip
 
-    - name: 安装 Proton Clang
-      uses: RobSis/zstd-installer@v1
-      with:
-        url: https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.tar.zst
-        dir: proton-clang
+    - name: 下载并安装 Proton Clang
+      run: |
+        mkdir -p $TOOLCHAIN_PATH
+        cd $TOOLCHAIN_PATH
+        wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
+        unzip 20210522.zip
+        cd ..
 
     - name: 设置环境变量
       run: |
         echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
-        echo "PATH=${{ env.TOOLCHAIN_PATH }}/bin:$PATH" >> $GITHUB_ENV
+        echo "PATH=${{ env.TOOLCHAIN_PATH }}/proton-clang-20210522/bin:$PATH" >> $GITHUB_ENV
         ccache --set-config=sloppiness=file_macro,locale,time_macros
 
     - name: 构建准备
