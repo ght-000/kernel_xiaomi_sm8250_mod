@@ -34,7 +34,7 @@ jobs:
       # 克隆内核源码
       - name: Clone kernel source
         run: |
-          git clone --depth=1 --branch android14-lineage21-mod https://github.com/liyafe1997/kernel_xiaomi_sm8250_mod.git kernel_xiaomi_sm8250_mod
+          git clone --depth=1 --branch android14-lineage21-mod https://github.com/ght-000/kernel_xiaomi_sm8250_mod.git kernel_xiaomi_sm8250_mod
 
       # 编译内核
       - name: Build kernel
