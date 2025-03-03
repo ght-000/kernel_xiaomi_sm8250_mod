@@ -1,79 +1,55 @@
 name: Kernel Build
-
 on:
+  push:
+    branches: [ "android14-lineage21-mod" ]
+  pull_request:
+    branches: [ "android14-lineage21-mod" ]
   workflow_dispatch:
-    inputs:
-      target_device:
-        description: '目标设备 (如 lmi, umi)'
-        required: true
-      enable_ksu:
-        description: '启用 KernelSU (yes/no)'
-        required: false
-        default: 'no'
-
 jobs:
   build-kernel:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      TOOLCHAIN_PATH: ${{ github.workspace }}/proton-clang
-    
+    strategy:
+      matrix:
+        device: [
+          alioth, apollo, lmi, thyme, umi, pipa,
+          psyche, munch, cmi, cas, elish, enuma, dagu
+        ]
+        ksu: ["", "ksu"]
+        exclude:
+          - device: pipa
+            ksu: "ksu"
+    name: Build ${{ matrix.device }} ${{ matrix.ksu && 'with KSU' || 'No KSU' }}
     steps:
-    - name: 检出代码
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
-
-    - name: 安装依赖
+    - name: Setup Build Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y \
-          ccache \
-          clang \
-          gcc-aarch64-linux-gnu \
-          gcc-arm-linux-gnueabi \
-          libncurses-dev \
-          libssl-dev \
-          python3 \
-          make \
-          zip
-
-    - name: 下载并安装 Proton Clang
+        sudo apt-get install -y build-essential git curl wget \
+          bison flex zip bc cpio libssl-dev ccache python-is-python3
+    - name: Setup Proton Clang
       run: |
-        mkdir -p $TOOLCHAIN_PATH
-        cd $TOOLCHAIN_PATH
-        wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
-        unzip 20210522.zip
-        cd ..
-
-    - name: 设置环境变量
-      run: |
-        echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
-        echo "PATH=${{ env.TOOLCHAIN_PATH }}/proton-clang-20210522/bin:$PATH" >> $GITHUB_ENV
-        ccache --set-config=sloppiness=file_macro,locale,time_macros
-
-    - name: 构建准备
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        ccache --zero-stats
-
-    - name: 执行编译
-      run: |
-        build_args="${{ inputs.target_device }}"
-        if [ "${{ inputs.enable_ksu }}" = "yes" ]; then
-          build_args="$build_args ksu"
-        fi
-        
-        bash build.sh $build_args
-
-    - name: 上传编译产物
-      uses: actions/upload-artifact@v4
+        mkdir -p $HOME/proton-clang
+        wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip -O proton.zip
+        unzip proton.zip -d $HOME/proton-clang/
+        echo "PROTON_CLANG=$HOME/proton-clang/proton-clang-20210522" >> $GITHUB_ENV
+    - name: Setup ccache
+      uses: actions/cache@v3
       with:
-        name: kernel-build-${{ inputs.target_device }}
+        path: ~/.cache/ccache_mikernel
+        key: ${{ runner.os }}-ccache-${{ matrix.device }}-${{ hashFiles('**/*.c') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+    - name: Build Kernel
+      run: |
+        export PATH="$PROTON_CLANG/bin:$PATH"
+        export CCACHE_DIR=~/.cache/ccache_mikernel
+        bash build.sh ${{ matrix.device }} ${{ matrix.ksu }}
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: kernel-${{ matrix.device }}-${{ matrix.ksu && 'ksu' || 'noksu' }}
         path: |
-          ./Kernel_AOSP*.zip
-          ./Kernel_MIUI*.zip
-
-    - name: 显示 ccache 统计
-      run: ccache -s
+          out/*.zip
+          out/*.img
