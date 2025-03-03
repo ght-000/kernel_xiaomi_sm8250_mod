@@ -45,7 +45,7 @@ jobs:
 
       # 上传编译结果
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4 # 使用最新版本 v4
         with:
           name: kernel-build-output
           path: kernel_xiaomi_sm8250_mod/out/
