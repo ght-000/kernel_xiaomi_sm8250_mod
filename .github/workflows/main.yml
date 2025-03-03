@@ -39,7 +39,7 @@ jobs:
       # 编译内核
       - name: Build kernel
         run: |
-          export PATH=$(pwd)/proton-clang/bin:$PATH
+          export TOOLCHAIN_PATH=$(pwd)/proton-clang/bin:$PATH
           cd kernel_xiaomi_sm8250_mod
           bash build.sh lmi ksu
 
