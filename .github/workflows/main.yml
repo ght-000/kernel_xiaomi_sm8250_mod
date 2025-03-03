@@ -11,47 +11,41 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # 检出当前仓库代码
-      - name: Checkout repository
+      # 检出工作流脚本所在的仓库（如果需要）
+      - name: Checkout workflow repository
         uses: actions/checkout@v3
-        with:
-          repository: liyafe1997/kernel_xiaomi_sm8250_mod
-          ref: android14-lineage21-mod
 
-      # 设置基础环境
-      - name: Install dependencies
+      # 设置编译环境
+      - name: Set up build environment
         run: |
           sudo apt update
           sudo apt install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache
 
-      # 下载并解压 Proton Clang 工具链
-      - name: Download and setup Proton Clang
+      # 下载 Proton Clang 工具链
+      - name: Download Proton Clang toolchain
         run: |
-          mkdir -p /root/proton-clang
-          cd /root/proton-clang
+          mkdir -p proton-clang
+          cd proton-clang
           wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
           unzip 20210522.zip
-          mv proton-clang-20210522 proton-clang-20210522-bin
-          echo "Proton Clang toolchain downloaded and extracted."
+          mv proton-clang-20210522/* .
+          rm -rf proton-clang-20210522 20210522.zip
 
-      # 克隆项目到指定目录
+      # 克隆内核源码
       - name: Clone kernel source
         run: |
-          mkdir -p /root/kernel_xiaomi_sm8250_mod
-          cp -r ./* /root/kernel_xiaomi_sm8250_mod/
-          echo "Kernel source copied to /root/kernel_xiaomi_sm8250_mod."
+          git clone --depth=1 --branch android14-lineage21-mod https://github.com/liyafe1997/kernel_xiaomi_sm8250_mod.git kernel_xiaomi_sm8250_mod
 
-      # 运行 build.sh 脚本
+      # 编译内核
       - name: Build kernel
-        working-directory: /root/kernel_xiaomi_sm8250_mod
         run: |
-          chmod +x build.sh
+          export PATH=$(pwd)/proton-clang/bin:$PATH
+          cd kernel_xiaomi_sm8250_mod
           bash build.sh lmi ksu
-          echo "Kernel build completed."
 
       # 上传编译结果
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: kernel-build-output
-          path: /root/kernel_xiaomi_sm8250_mod/out
+          path: kernel_xiaomi_sm8250_mod/out/
