@@ -1,54 +1,57 @@
 name: Build Android Kernel
+
 on:
-  workflow_dispatch: # 允许手动触发
   push:
-    branches: [ main ] # 根据你的仓库分支调整
+    branches:
+      - android14-lineage21-mod
+  workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-22.04
-    container:
-      image: ubuntu:22.04
-      options: --privileged # 授予必要权限
+
     steps:
-    - name: Set up environment
-      run: |
-        apt-get update -qq
-        DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-          build-essential git curl wget bison flex zip bc cpio libssl-dev ccache \
-          python3 python-is-python3
-        ln -s /usr/bin/ccache /usr/local/bin/gcc
-        ln -s /usr/bin/ccache /usr/local/bin/g++
-    - name: Prepare workspace
-      run: mkdir -p ${GITHUB_WORKSPACE}/kernel_build
-    - name: Install Proton Clang
-      run: |
-        cd ${GITHUB_WORKSPACE}
-        wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
-        unzip 20210522.zip -d proton-clang
-        mv proton-clang/proton-clang-20210522 proton-clang/proton-clang
-    - name: Clone kernel source
-      run: |
-        git clone https://github.com/liyafe1997/kernel_xiaomi_sm8250_mod.git \
-          --depth=1 \
-          --branch=android14-lineage21-mod \
-          ${GITHUB_WORKSPACE}/kernel_xiaomi_sm8250_mod
-    - name: Build kernel
-      run: |
-        cd ${GITHUB_WORKSPACE}/kernel_xiaomi_sm8250_mod
-        chmod +x build.sh
-        CCACHE_DIR="${GITHUB_WORKSPACE}/ccache" \
-        PATH="${GITHUB_WORKSPACE}/proton-clang/proton-clang/bin:${PATH}" \
-        bash build.sh lmi ksu
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: kernel-build
-        path: |
-          ${GITHUB_WORKSPACE}/kernel_xiaomi_sm8250_mod/out/*.zip
-          ${GITHUB_WORKSPACE}/kernel_xiaomi_sm8250_mod/out/*.img
-    - name: Upload ccache
-      uses: actions/upload-artifact@v3
-      if: ${{ always() }}
-      with:
-        name: ccache
-        path: ${GITHUB_WORKSPACE}/ccache
+      # 检出当前仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          repository: liyafe1997/kernel_xiaomi_sm8250_mod
+          ref: android14-lineage21-mod
+
+      # 设置基础环境
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential git curl wget bison flex zip bc cpio libssl-dev ccache
+
+      # 下载并解压 Proton Clang 工具链
+      - name: Download and setup Proton Clang
+        run: |
+          mkdir -p /root/proton-clang
+          cd /root/proton-clang
+          wget https://github.com/kdrag0n/proton-clang/archive/refs/tags/20210522.zip
+          unzip 20210522.zip
+          mv proton-clang-20210522 proton-clang-20210522-bin
+          echo "Proton Clang toolchain downloaded and extracted."
+
+      # 克隆项目到指定目录
+      - name: Clone kernel source
+        run: |
+          mkdir -p /root/kernel_xiaomi_sm8250_mod
+          cp -r ./* /root/kernel_xiaomi_sm8250_mod/
+          echo "Kernel source copied to /root/kernel_xiaomi_sm8250_mod."
+
+      # 运行 build.sh 脚本
+      - name: Build kernel
+        working-directory: /root/kernel_xiaomi_sm8250_mod
+        run: |
+          chmod +x build.sh
+          bash build.sh lmi ksu
+          echo "Kernel build completed."
+
+      # 上传编译结果
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-build-output
+          path: /root/kernel_xiaomi_sm8250_mod/out
